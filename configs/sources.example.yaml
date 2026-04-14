@@ -13,19 +13,18 @@ sources:
     publish_time_selector: ".box01 span, .pub_time, time"
     channel: "people_env"
 
-  - name: xinhuanet_environment
+  - name: xinhuanet_single
     source_type: news
-    domain: www.xinhuanet.com
+    domain: www.news.cn
     region_level: national
     category: environment
     enabled: true
     seed_urls:
-      - https://www.xinhuanet.com/environment/top.htm
-    list_selector: "a"
+      - https://www.news.cn/20260330/82d426de3ca341b5b6a15be402efde6d/c.html
+    list_selector: null
     title_selector: "h1"
-    content_selector: ".article, #detail, .content, body"
-    publish_time_selector: ".h-time, .pubTime, time"
-    channel: "xinhuanet_environment"
+    content_selector: "body"
+    publish_time_selector: "time"
 
   - name: gov_notice
     source_type: government
