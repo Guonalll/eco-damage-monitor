@@ -1,0 +1,40 @@
+sources:
+  - name: example_news
+    source_type: news
+    domain: news.example.com
+    region_level: national
+    category: environment
+    enabled: false
+    seed_urls:
+      - https://news.example.com/environment
+    list_selector: "a.article-link"
+    title_selector: "h1"
+    content_selector: "div.article-content"
+    publish_time_selector: "time"
+    channel: "environment"
+  - name: example_gov
+    source_type: government
+    domain: gov.example.com
+    region_level: provincial
+    category: ecology
+    enabled: false
+    seed_urls:
+      - https://gov.example.com/zwgk/sthj/
+    list_selector: "ul.list a"
+    title_selector: "h1"
+    content_selector: "div.TRS_Editor"
+    publish_time_selector: "span.pub-time"
+    channel: "government_notice"
+  - name: example_forum
+    source_type: forum
+    domain: forum.example.com
+    region_level: city
+    category: public_discussion
+    enabled: false
+    seed_urls:
+      - https://forum.example.com/open-board
+    list_selector: "div.thread-list a"
+    title_selector: "h1.thread-title"
+    content_selector: "div.thread-body"
+    publish_time_selector: "span.post-time"
+    channel: "open_forum"

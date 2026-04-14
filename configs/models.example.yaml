@@ -1,0 +1,13 @@
+models:
+  relevance:
+    backend: keyword
+    model_name: null
+  event_classifier:
+    backend: keyword
+    model_name: null
+  embedding:
+    backend: tfidf
+    model_name: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+  topic_model:
+    backend: nmf
+    model_name: bertopic

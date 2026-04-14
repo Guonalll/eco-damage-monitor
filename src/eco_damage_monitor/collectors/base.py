@@ -1,0 +1,123 @@
+from __future__ import annotations
+
+import time
+import urllib.parse
+import urllib.robotparser
+from abc import ABC, abstractmethod
+from collections.abc import Iterable
+from datetime import UTC, datetime
+
+import httpx
+from tenacity import retry, stop_after_attempt, wait_fixed
+
+from eco_damage_monitor.cleaners.text_cleaner import clean_html_text
+from eco_damage_monitor.config import AppFileConfig, SourceDefinition
+from eco_damage_monitor.models.schemas import EcoDocument
+from eco_damage_monitor.utils.hashing import stable_hash
+
+
+class BaseCollector(ABC):
+    def __init__(self, source: SourceDefinition, app_config: AppFileConfig) -> None:
+        self.source = source
+        self.app_config = app_config
+        self.client = httpx.Client(timeout=app_config.request.timeout, follow_redirects=True)
+        self._last_request_time = 0.0
+        self._robots_cache: dict[str, urllib.robotparser.RobotFileParser] = {}
+
+    @property
+    def source_name(self) -> str:
+        return self.source.name
+
+    @property
+    def source_type(self) -> str:
+        return self.source.source_type
+
+    @property
+    def domain(self) -> str:
+        return self.source.domain
+
+    @property
+    def region_level(self) -> str:
+        return self.source.region_level
+
+    @property
+    def category(self) -> str:
+        return self.source.category
+
+    @property
+    def allowed_methods(self) -> list[str]:
+        return self.source.allowed_methods
+
+    def close(self) -> None:
+        self.client.close()
+
+    def throttle(self) -> None:
+        elapsed = time.time() - self._last_request_time
+        wait_time = max(0.0, self.app_config.request.rate_limit_per_domain - elapsed)
+        if wait_time:
+            time.sleep(wait_time)
+        self._last_request_time = time.time()
+
+    def _get_robot_parser(self, url: str) -> urllib.robotparser.RobotFileParser:
+        parsed = urllib.parse.urlparse(url)
+        base = f"{parsed.scheme}://{parsed.netloc}"
+        if base not in self._robots_cache:
+            parser = urllib.robotparser.RobotFileParser()
+            parser.set_url(f"{base}/robots.txt")
+            try:
+                parser.read()
+            except Exception:
+                pass
+            self._robots_cache[base] = parser
+        return self._robots_cache[base]
+
+    @retry(stop=stop_after_attempt(3), wait=wait_fixed(1))
+    def fetch(self, url: str) -> str:
+        if self.app_config.respect_robots:
+            parser = self._get_robot_parser(url)
+            if not parser.can_fetch("*", url):
+                raise PermissionError(f"robots.txt disallows fetching {url}")
+        self.throttle()
+        response = self.client.get(url, headers={"User-Agent": "eco-damage-monitor/0.1"})
+        response.raise_for_status()
+        return response.text
+
+    def build_document(
+        self,
+        *,
+        title: str,
+        url: str,
+        html: str,
+        text: str,
+        publish_time: datetime | None,
+        province: str | None = None,
+        city: str | None = None,
+        county: str | None = None,
+        attachments: list[str] | None = None,
+    ) -> EcoDocument:
+        attachments = attachments or []
+        doc_id = stable_hash(f"{self.source_name}|{url}")
+        return EcoDocument(
+            doc_id=doc_id,
+            title=title,
+            content=text,
+            summary=text[:160],
+            source_name=self.source_name,
+            source_type=self.source_type,
+            publish_time=publish_time,
+            crawl_time=datetime.now(UTC),
+            url=url,
+            province=province,
+            city=city,
+            district_county=county,
+            normalized_place_names=[],
+            channel=self.source.channel,
+            html=html,
+            text=clean_html_text(html) if not text else text,
+            attachments=attachments,
+            hash_id=stable_hash(text[:500]),
+        )
+
+    @abstractmethod
+    def collect(self) -> Iterable[EcoDocument]:
+        raise NotImplementedError

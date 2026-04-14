@@ -1,0 +1,14 @@
+app_name: eco-damage-monitor
+environment: dev
+log_level: INFO
+db_url: sqlite:///data/eco_monitor.db
+data_dir: data
+respect_robots: true
+request:
+  timeout: 15
+  retries: 3
+  rate_limit_per_domain: 1.0
+analysis:
+  relevance_threshold: 0.35
+  credibility_default: 0.6
+  near_duplicate_threshold: 3
