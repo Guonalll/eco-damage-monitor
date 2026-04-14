@@ -12,20 +12,16 @@ permissions:
   pages: write
   id-token: write
 
-concurrency:
-  group: "pages"
-  cancel-in-progress: true
-
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
@@ -55,12 +51,22 @@ jobs:
           mkdir -p site
           python - <<'PY'
           import json
+          import math
           from datetime import datetime, UTC
           from pathlib import Path
 
           from eco_damage_monitor.analytics.reporting import AnalyticsService
           from eco_damage_monitor.config import load_settings
           from eco_damage_monitor.storage.database import Database
+
+          def sanitize(value):
+              if isinstance(value, float) and math.isnan(value):
+                  return None
+              if isinstance(value, dict):
+                  return {k: sanitize(v) for k, v in value.items()}
+              if isinstance(value, list):
+                  return [sanitize(v) for v in value]
+              return value
 
           _, app_config, _, _ = load_settings()
           db = Database(app_config.db_url)
@@ -85,8 +91,10 @@ jobs:
               "report_markdown": report_markdown,
           }
 
+          summary = sanitize(summary)
+
           Path("site/summary.json").write_text(
-              json.dumps(summary, ensure_ascii=False, default=str, indent=2),
+              json.dumps(summary, ensure_ascii=False, indent=2, allow_nan=False, default=str),
               encoding="utf-8",
           )
           Path("site/.nojekyll").write_text("", encoding="utf-8")
@@ -107,17 +115,17 @@ jobs:
 
       - name: Upload Pages artifact
         if: github.event_name != 'pull_request'
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v3
         with:
           path: site/
 
   deploy:
     if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
 
     steps:
       - name: Deploy to GitHub Pages
