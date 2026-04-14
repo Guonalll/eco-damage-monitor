@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>生态破坏监测结果</title>
+  <style>
+    :root {
+      --bg: #f4f7f2;
+      --card: #ffffff;
+      --line: #d7e1d1;
+      --text: #183028;
+      --muted: #587065;
+      --accent: #2f7d57;
+      --accent-2: #b9d7b0;
+      --danger: #9b5b3d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background:
+        radial-gradient(circle at top left, #dcebd5 0, transparent 28%),
+        linear-gradient(180deg, #f8fbf6 0%, var(--bg) 100%);
+      color: var(--text);
+    }
+    .wrap {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 28px 18px 60px;
+    }
+    .hero {
+      background: linear-gradient(135deg, #204f3b 0%, #396f54 60%, #7ba56b 100%);
+      color: #fff;
+      border-radius: 22px;
+      padding: 28px;
+      box-shadow: 0 12px 32px rgba(32, 79, 59, 0.18);
+    }
+    .hero h1 {
+      margin: 0 0 8px;
+      font-size: 32px;
+    }
+    .hero p {
+      margin: 0;
+      color: rgba(255,255,255,0.88);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-top: 20px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: 0 8px 22px rgba(33, 52, 42, 0.06);
+    }
+    .metric {
+      font-size: 30px;
+      font-weight: 700;
+      color: var(--accent);
+      margin-top: 6px;
+    }
+    .muted {
+      color: var(--muted);
+      font-size: 14px;
+    }
+    h2 {
+      margin: 28px 0 12px;
+      font-size: 22px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--card);
+      border-radius: 18px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+    }
+    th, td {
+      text-align: left;
+      padding: 12px 14px;
+      border-bottom: 1px solid #edf2ea;
+      vertical-align: top;
+      font-size: 14px;
+    }
+    th {
+      background: #eef6ea;
+      color: #2a4a3a;
+    }
+    tr:last-child td {
+      border-bottom: none;
+    }
+    .pill {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #edf6ef;
+      color: var(--accent);
+      font-size: 12px;
+      margin-right: 6px;
+      margin-bottom: 6px;
+    }
+    .error {
+      padding: 16px;
+      background: #fff4ef;
+      border: 1px solid #f0d3c4;
+      border-radius: 12px;
+      color: var(--danger);
+    }
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    .footer {
+      margin-top: 24px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin: 0;
+      font-size: 13px;
+      color: #30473d;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <h1>广域生态破坏信息监测面板</h1>
+      <p>基于 GitHub Actions 自动生成的静态分析结果页</p>
+    </section>
+
+    <div id="app">
+      <p class="muted">正在加载结果...</p>
+    </div>
+
+    <div class="footer">
+      数据来源于仓库工作流自动生成的公开测试/分析结果。
+    </div>
+  </div>
+
+  <script>
+    function safe(v, d = "-") {
+      return v === null || v === undefined || v === "" ? d : v;
+    }
+
+    function renderTable(title, rows, columns) {
+      if (!rows || rows.length === 0) {
+        return `<div class="card"><h2>${title}</h2><p class="muted">暂无数据</p></div>`;
+      }
+      const head = columns.map(c => `<th>${c.label}</th>`).join("");
+      const body = rows.map(row => {
+        const tds = columns.map(c => `<td>${c.render ? c.render(row[c.key], row) : safe(row[c.key])}</td>`).join("");
+        return `<tr>${tds}</tr>`;
+      }).join("");
+      return `
+        <h2>${title}</h2>
+        <table>
+          <thead><tr>${head}</tr></thead>
+          <tbody>${body}</tbody>
+        </table>
+      `;
+    }
+
+    fetch("./summary.json")
+      .then(r => {
+        if (!r.ok) throw new Error("无法读取 summary.json");
+        return r.json();
+      })
+      .then(data => {
+        const metrics = `
+          <div class="grid">
+            <div class="card">
+              <div class="muted">文档总量</div>
+              <div class="metric">${safe(data.total_docs, 0)}</div>
+            </div>
+            <div class="card">
+              <div class="muted">报告生成时间</div>
+              <div class="metric" style="font-size:18px">${safe(data.generated_at)}</div>
+            </div>
+            <div class="card">
+              <div class="muted">来源类型数</div>
+              <div class="metric">${(data.by_source_type || []).length}</div>
+            </div>
+            <div class="card">
+              <div class="muted">地区覆盖数</div>
+              <div class="metric">${(data.map_aggregation || []).length}</div>
+            </div>
+          </div>
+        `;
+
+        const sourceTable = renderTable("来源类型统计", data.by_source_type || [], [
+          { key: "source_type", label: "来源类型" },
+          { key: "count", label: "数量" }
+        ]);
+
+        const timeTable = renderTable("时间趋势", data.time_series || [], [
+          { key: "date", label: "日期" },
+          { key: "count", label: "数量" }
+        ]);
+
+        const caseTable = renderTable("高影响案例", data.high_impact_cases || [], [
+          { key: "title", label: "标题" },
+          { key: "province", label: "省份" },
+          { key: "event_type", label: "事件类型" },
+          { key: "relevance_score", label: "相关性" },
+          {
+            key: "url",
+            label: "链接",
+            render: (v) => v ? `<a href="${v}" target="_blank" rel="noopener noreferrer">查看原文</a>` : "-"
+          }
+        ]);
+
+        const regionTable = renderTable("地图聚合结果", data.map_aggregation || [], [
+          { key: "province", label: "省份" },
+          { key: "city", label: "城市" },
+          { key: "count", label: "数量" }
+        ]);
+
+        const reportBlock = `
+          <h2>Markdown 报告预览</h2>
+          <div class="card">
+            <pre>${safe(data.report_markdown, "暂无报告").replace(/</g, "&lt;")}</pre>
+          </div>
+        `;
+
+        document.getElementById("app").innerHTML =
+          metrics + sourceTable + timeTable + caseTable + regionTable + reportBlock;
+      })
+      .catch(err => {
+        document.getElementById("app").innerHTML = `
+          <div class="error">
+            页面加载失败：${err.message}
+          </div>
+        `;
+      });
+  </script>
+</body>
+</html>
