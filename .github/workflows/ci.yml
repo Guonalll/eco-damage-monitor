@@ -1,22 +1,31 @@
-name: CI
+name: CI and Pages
 
 on:
   push:
-    branches: ["main", "master"]
+    branches: ["main"]
   pull_request:
-    branches: ["main", "master"]
+    branches: ["main"]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
 jobs:
-  test:
+  build:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
@@ -28,3 +37,89 @@ jobs:
 
       - name: Run tests
         run: pytest
+
+      - name: Init database
+        run: eco-monitor init-db
+
+      - name: Seed demo data
+        run: eco-monitor seed-demo
+
+      - name: Analyze data
+        run: eco-monitor analyze
+
+      - name: Generate markdown report
+        run: eco-monitor generate-report --output data/exports/daily_report.md
+
+      - name: Build static summary for Pages
+        run: |
+          mkdir -p site
+          python - <<'PY'
+          import json
+          from datetime import datetime, UTC
+          from pathlib import Path
+
+          from eco_damage_monitor.analytics.reporting import AnalyticsService
+          from eco_damage_monitor.config import load_settings
+          from eco_damage_monitor.storage.database import Database
+
+          _, app_config, _, _ = load_settings()
+          db = Database(app_config.db_url)
+          rows = db.fetch_documents()
+          analytics = AnalyticsService(rows)
+
+          report_path = Path("data/exports/daily_report.md")
+          report_markdown = report_path.read_text(encoding="utf-8") if report_path.exists() else ""
+
+          summary = {
+              "generated_at": datetime.now(UTC).isoformat(),
+              "total_docs": len(rows),
+              "time_series": analytics.time_series(),
+              "by_source_type": analytics.by_source_type(),
+              "by_region": analytics.by_region(),
+              "high_impact_cases": analytics.high_impact_cases(),
+              "topic_evolution": analytics.topic_evolution(),
+              "map_aggregation": analytics.map_aggregation(),
+              "frequent_entities": analytics.frequent_entities(),
+              "rectification_ratio": analytics.rectification_ratio(),
+              "enforcement_and_restoration_list": analytics.enforcement_and_restoration_list(),
+              "report_markdown": report_markdown,
+          }
+
+          Path("site/summary.json").write_text(
+              json.dumps(summary, ensure_ascii=False, default=str, indent=2),
+              encoding="utf-8",
+          )
+          Path("site/.nojekyll").write_text("", encoding="utf-8")
+          PY
+
+      - name: Upload analysis artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: eco-damage-results
+          path: |
+            data/exports/
+            data/*.db
+            site/summary.json
+
+      - name: Configure Pages
+        if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site/
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
