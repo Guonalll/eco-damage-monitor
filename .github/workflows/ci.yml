@@ -37,8 +37,8 @@ jobs:
       - name: Init database
         run: eco-monitor init-db
 
-      - name: Seed demo data
-        run: eco-monitor seed-demo
+      - name: Collect public data
+        run: eco-monitor collect
 
       - name: Analyze data
         run: eco-monitor analyze
