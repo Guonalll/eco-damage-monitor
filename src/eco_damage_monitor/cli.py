@@ -125,8 +125,11 @@ def analyze() -> None:
 @app.command("export")
 def export(output: str = "data/exports/documents.jsonl") -> None:
     _, app_config, _, _ = load_settings()
+    output_path = Path(output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
     db = Database(app_config.db_url)
-    db.export_jsonl(output)
+    db.export_jsonl(str(output_path))
     typer.echo(f"Exported data to {output}")
 
 
@@ -136,7 +139,11 @@ def generate_report(output: str = "data/exports/daily_report.md", period_name: s
     db = Database(app_config.db_url)
     analytics = AnalyticsService(db.fetch_documents())
     report = analytics.markdown_report(period_name)
-    Path(output).write_text(report, encoding="utf-8")
+
+    output_path = Path(output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(report, encoding="utf-8")
+
     typer.echo(f"Generated report: {output}")
 
 
