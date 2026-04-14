@@ -53,13 +53,22 @@ class ExampleNewsCollector(BaseCollector):
 
                 detail = BeautifulSoup(detail_html, "lxml")
                 title = detail.select_one(self.source.title_selector or "h1")
+                if title is None and detail.title:
+                    title_text = detail.title.get_text(strip=True)
+                else:
+                    title_text = title.get_text(strip=True) if title else ""
+
                 content = detail.select_one(self.source.content_selector or "body")
+                if content is None:
+                    content_text = detail.get_text("\n", strip=True)
+                else:
+                    content_text = content.get_text("\n", strip=True)
                 time_node = detail.select_one(self.source.publish_time_selector or "time")
 
-                if not title or not content:
+                if not title_text:
                     continue
 
-                body_text = content.get_text("\n", strip=True)
+                body_text = content_text
                 if len(body_text) < 80:
                     continue
 
@@ -71,7 +80,7 @@ class ExampleNewsCollector(BaseCollector):
                         publish_time = datetime.now(UTC)
 
                 yield self.build_document(
-                    title=title.get_text(strip=True),
+                    title=title_text,
                     url=detail_url,
                     html=detail_html,
                     text=body_text,
