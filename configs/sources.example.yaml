@@ -1,40 +1,42 @@
 sources:
-  - name: example_news
+  - name: people_env
     source_type: news
-    domain: news.example.com
+    domain: env.people.com.cn
     region_level: national
     category: environment
-    enabled: false
+    enabled: true
     seed_urls:
-      - https://news.example.com/environment
-    list_selector: "a.article-link"
+      - https://env.people.com.cn/GB/193600/
+    list_selector: "a"
     title_selector: "h1"
-    content_selector: "div.article-content"
-    publish_time_selector: "time"
-    channel: "environment"
-  - name: example_gov
+    content_selector: ".rm_txt_con, .box_con, .content, body"
+    publish_time_selector: ".box01 span, .pub_time, time"
+    channel: "people_env"
+
+  - name: xinhuanet_environment
+    source_type: news
+    domain: www.xinhuanet.com
+    region_level: national
+    category: environment
+    enabled: true
+    seed_urls:
+      - https://www.xinhuanet.com/environment/top.htm
+    list_selector: "a"
+    title_selector: "h1"
+    content_selector: ".article, #detail, .content, body"
+    publish_time_selector: ".h-time, .pubTime, time"
+    channel: "xinhuanet_environment"
+
+  - name: gov_notice
     source_type: government
-    domain: gov.example.com
+    domain: sthjt.hunan.gov.cn
     region_level: provincial
     category: ecology
-    enabled: false
+    enabled: true
     seed_urls:
-      - https://gov.example.com/zwgk/sthj/
-    list_selector: "ul.list a"
+      - http://sthjt.hunan.gov.cn/sthjt/xxgk/gzdt/
+    list_selector: "a"
     title_selector: "h1"
-    content_selector: "div.TRS_Editor"
-    publish_time_selector: "span.pub-time"
-    channel: "government_notice"
-  - name: example_forum
-    source_type: forum
-    domain: forum.example.com
-    region_level: city
-    category: public_discussion
-    enabled: false
-    seed_urls:
-      - https://forum.example.com/open-board
-    list_selector: "div.thread-list a"
-    title_selector: "h1.thread-title"
-    content_selector: "div.thread-body"
-    publish_time_selector: "span.post-time"
-    channel: "open_forum"
+    content_selector: ".TRS_Editor, .content, .article, body"
+    publish_time_selector: ".time, .pub-time, time"
+    channel: "gov_notice"
