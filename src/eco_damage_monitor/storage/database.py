@@ -27,6 +27,7 @@ documents = Table(
     Column("province", String(64)),
     Column("city", String(64)),
     Column("district_county", String(64)),
+    Column("township_if_any", String(64)),
     Column("normalized_place_names", JSON),
     Column("lat", Float),
     Column("lon", Float),
