@@ -71,7 +71,14 @@ class BaseCollector(ABC):
             self._robots_cache[base] = parser
         return self._robots_cache[base]
 
-    @retry(stop=stop_after_attempt(3), wait=wait_fixed(1))
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_fixed(1),
+        retry=lambda state: (
+            state.outcome.failed()
+            and not isinstance(state.outcome.exception(), PermissionError)
+        ),
+    )
     def fetch(self, url: str) -> str:
         if self.app_config.respect_robots:
             parser = self._get_robot_parser(url)
