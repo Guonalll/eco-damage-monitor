@@ -13,11 +13,15 @@ from eco_damage_monitor.collectors.base import BaseCollector
 class ExampleNewsCollector(BaseCollector):
     def collect(self) -> Iterable:
         seen_urls: set[str] = set()
-
         for seed_url in self.source.seed_urls:
-            html = self.fetch(seed_url)
-            soup = BeautifulSoup(html, "lxml")
+            try:
+                html = self.fetch(seed_url)
+            except PermissionError:
+                continue
+            except Exception:
+                continue
 
+            soup = BeautifulSoup(html, "lxml")
             for link in soup.select(self.source.list_selector or "a"):
                 href = link.get("href")
                 if not href:
@@ -25,7 +29,6 @@ class ExampleNewsCollector(BaseCollector):
 
                 detail_url = urljoin(seed_url, href)
                 parsed = urlparse(detail_url)
-
                 if parsed.scheme not in {"http", "https"}:
                     continue
                 if self.domain not in parsed.netloc:
@@ -36,9 +39,10 @@ class ExampleNewsCollector(BaseCollector):
                     continue
 
                 seen_urls.add(detail_url)
-
                 try:
                     detail_html = self.fetch(detail_url)
+                except PermissionError:
+                    continue
                 except Exception:
                     continue
 
