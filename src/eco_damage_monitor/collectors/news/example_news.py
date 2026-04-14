@@ -14,20 +14,25 @@ class ExampleNewsCollector(BaseCollector):
     def collect(self) -> Iterable:
         seen_urls: set[str] = set()
         for seed_url in self.source.seed_urls:
-            try:
-                html = self.fetch(seed_url)
-            except PermissionError:
-                continue
-            except Exception:
-                continue
-
-            soup = BeautifulSoup(html, "lxml")
-            for link in soup.select(self.source.list_selector or "a"):
-                href = link.get("href")
-                if not href:
+            if not self.source.list_selector:
+                detail_urls = [seed_url]
+            else:
+                try:
+                    html = self.fetch(seed_url)
+                except PermissionError:
+                    continue
+                except Exception:
                     continue
 
-                detail_url = urljoin(seed_url, href)
+                soup = BeautifulSoup(html, "lxml")
+                detail_urls = []
+                for link in soup.select(self.source.list_selector or "a"):
+                    href = link.get("href")
+                    if not href:
+                        continue
+                    detail_urls.append(urljoin(seed_url, href))
+
+            for detail_url in detail_urls:
                 parsed = urlparse(detail_url)
                 if parsed.scheme not in {"http", "https"}:
                     continue
