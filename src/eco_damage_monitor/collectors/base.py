@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import time
 import urllib.parse
 import urllib.robotparser
@@ -22,7 +23,17 @@ class BaseCollector(ABC):
         self.app_config = app_config
         self.client = httpx.Client(timeout=app_config.request.timeout, follow_redirects=True)
         self._last_request_time = 0.0
-        self._robots_cache: dict[str, urllib.robotparser.RobotFileParser] = {}
+        self._robots_cache: dict[str, urllib.robotparser.RobotFileParser | None] = {}
+        self.logger = logging.getLogger(f"eco_damage_monitor.collectors.{self.source_name}")
+        self.stats: dict[str, int] = {
+            "seed_urls": len(self.source.seed_urls),
+            "list_pages_fetched": 0,
+            "detail_pages_fetched": 0,
+            "documents_collected": 0,
+            "skipped": 0,
+            "errors": 0,
+            "robots_blocked": 0,
+        }
 
     @property
     def source_name(self) -> str:
@@ -58,7 +69,28 @@ class BaseCollector(ABC):
             time.sleep(wait_time)
         self._last_request_time = time.time()
 
-    def _get_robot_parser(self, url: str) -> urllib.robotparser.RobotFileParser:
+    def increment_stat(self, key: str, amount: int = 1) -> None:
+        self.stats[key] = self.stats.get(key, 0) + amount
+
+    def record_skip(self, reason: str, url: str | None = None) -> None:
+        self.increment_stat("skipped")
+        if url:
+            self.logger.info("Skipping %s: %s", url, reason)
+        else:
+            self.logger.info("Skipping item: %s", reason)
+
+    def record_error(self, stage: str, url: str, exc: Exception) -> None:
+        self.increment_stat("errors")
+        self.logger.warning("%s failed for %s: %s", stage, url, exc)
+
+    def record_success(self, url: str) -> None:
+        self.increment_stat("documents_collected")
+        self.logger.info("Collected document from %s", url)
+
+    def get_stats_snapshot(self) -> dict[str, int]:
+        return dict(self.stats)
+
+    def _get_robot_parser(self, url: str) -> urllib.robotparser.RobotFileParser | None:
         parsed = urllib.parse.urlparse(url)
         base = f"{parsed.scheme}://{parsed.netloc}"
         if base not in self._robots_cache:
@@ -67,7 +99,13 @@ class BaseCollector(ABC):
             try:
                 parser.read()
             except Exception:
-                pass
+                self.logger.warning("Unable to read robots.txt for %s; proceeding without robots enforcement", base)
+                self._robots_cache[base] = None
+                return None
+            if not parser.last_checked:
+                self.logger.warning("robots.txt for %s could not be verified; proceeding without robots enforcement", base)
+                self._robots_cache[base] = None
+                return None
             self._robots_cache[base] = parser
         return self._robots_cache[base]
 
@@ -82,7 +120,8 @@ class BaseCollector(ABC):
     def fetch(self, url: str) -> str:
         if self.app_config.respect_robots:
             parser = self._get_robot_parser(url)
-            if not parser.can_fetch("*", url):
+            if parser is not None and not parser.can_fetch("*", url):
+                self.increment_stat("robots_blocked")
                 raise PermissionError(f"robots.txt disallows fetching {url}")
         self.throttle()
         response = self.client.get(url, headers={"User-Agent": "eco-damage-monitor/0.1"})
