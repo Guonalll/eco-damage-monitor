@@ -95,18 +95,42 @@ class BaseCollector(ABC):
         base = f"{parsed.scheme}://{parsed.netloc}"
         if base not in self._robots_cache:
             parser = urllib.robotparser.RobotFileParser()
-            parser.set_url(f"{base}/robots.txt")
-            try:
-                parser.read()
-            except Exception:
-                self.logger.warning("Unable to read robots.txt for %s; proceeding without robots enforcement", base)
-                self._robots_cache[base] = None
-                return None
-            if not parser.last_checked:
-                self.logger.warning("robots.txt for %s could not be verified; proceeding without robots enforcement", base)
-                self._robots_cache[base] = None
-                return None
-            self._robots_cache[base] = parser
+            robots_url = f"{base}/robots.txt"
+            parser.set_url(robots_url)
+            last_exc: Exception | None = None
+            attempts = max(1, self.app_config.request.retries)
+            for _ in range(attempts):
+                try:
+                    self.throttle()
+                    response = self.client.get(
+                        robots_url,
+                        headers={"User-Agent": "eco-damage-monitor/0.1"},
+                    )
+                    if response.status_code in (401, 403):
+                        parser.disallow_all = True
+                        parser.modified()
+                        self._robots_cache[base] = parser
+                        return parser
+                    if 400 <= response.status_code < 500:
+                        parser.allow_all = True
+                        parser.modified()
+                        self._robots_cache[base] = parser
+                        return parser
+                    response.raise_for_status()
+                    parser.parse(response.text.splitlines())
+                    parser.modified()
+                    self._robots_cache[base] = parser
+                    return parser
+                except Exception as exc:
+                    last_exc = exc
+            self.logger.warning(
+                "Unable to read robots.txt for %s after %s attempts; proceeding without robots enforcement: %s",
+                base,
+                attempts,
+                last_exc,
+            )
+            self._robots_cache[base] = None
+            return None
         return self._robots_cache[base]
 
     @retry(
