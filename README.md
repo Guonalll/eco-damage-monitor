@@ -135,7 +135,7 @@ copy .env.example .env
 
 2. 编辑：
 - `configs/app.yaml`
-- `configs/sources.example.yaml`
+- `configs/sources.yaml`
 - `configs/models.example.yaml`
 
 3. 将需要启用的公开数据源改为 `enabled: true`。
