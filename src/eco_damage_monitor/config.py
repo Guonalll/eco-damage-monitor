@@ -17,7 +17,7 @@ except ModuleNotFoundError:  # pragma: no cover - fallback for lean environments
         def __init__(self, **data: Any) -> None:
             merged = {
                 "app_config": os.getenv("ECO_MONITOR_APP_CONFIG", "configs/app.yaml"),
-                "sources_config": os.getenv("ECO_MONITOR_SOURCES_CONFIG", "configs/sources.example.yaml"),
+                "sources_config": os.getenv("ECO_MONITOR_SOURCES_CONFIG", "configs/sources.yaml"),
                 "models_config": os.getenv("ECO_MONITOR_MODELS_CONFIG", "configs/models.example.yaml"),
                 "db_url": os.getenv("ECO_MONITOR_DB_URL"),
                 "log_level": os.getenv("ECO_MONITOR_LOG_LEVEL"),
@@ -82,14 +82,20 @@ class ModelsFileConfig(BaseModel):
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="ECO_MONITOR_", env_file=".env", extra="ignore")
     app_config: str = "configs/app.yaml"
-    sources_config: str = "configs/sources.example.yaml"
+    sources_config: str = "configs/sources.yaml"
     models_config: str = "configs/models.example.yaml"
     db_url: str | None = None
     log_level: str | None = None
 
 
 def load_yaml(path: str | Path) -> dict[str, Any]:
-    with Path(path).open("r", encoding="utf-8") as f:
+    yaml_path = Path(path)
+    if not yaml_path.exists():
+        raise FileNotFoundError(
+            f"Configuration file not found: {yaml_path}. "
+            "Create it first or point ECO_MONITOR_*_CONFIG to a valid path."
+        )
+    with yaml_path.open("r", encoding="utf-8") as f:
         return yaml.safe_load(f) or {}
 
 
