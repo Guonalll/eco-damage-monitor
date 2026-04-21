@@ -1,0 +1,42 @@
+sources:
+  - name: people_env
+    source_type: news
+    domain: env.people.com.cn
+    region_level: national
+    category: environment
+    enabled: true
+    seed_urls:
+      - https://env.people.com.cn/GB/193600/
+    list_selector: "a"
+    title_selector: "h1"
+    content_selector: ".rm_txt_con, .box_con, .content, body"
+    publish_time_selector: ".box01 span, .pub_time, time"
+    channel: "people_env"
+
+  - name: xinhuanet_single
+    source_type: news
+    domain: www.news.cn
+    region_level: national
+    category: environment
+    enabled: true
+    seed_urls:
+      - https://www.news.cn/20260330/82d426de3ca341b5b6a15be402efde6d/c.html
+    list_selector: null
+    title_selector: "h1"
+    content_selector: "body"
+    publish_time_selector: "time"
+    channel: "xinhuanet_single"
+
+  - name: gov_notice
+    source_type: government
+    domain: sthjt.hunan.gov.cn
+    region_level: provincial
+    category: ecology
+    enabled: true
+    seed_urls:
+      - https://sthjt.hunan.gov.cn/sthjt/xxgk/gzdt/
+    list_selector: "a"
+    title_selector: "h1"
+    content_selector: ".TRS_Editor, .content, .article, body"
+    publish_time_selector: ".time, .pub-time, time"
+    channel: "gov_notice"
