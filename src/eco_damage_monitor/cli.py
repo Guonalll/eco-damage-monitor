@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 
 import typer
@@ -23,6 +24,8 @@ from eco_damage_monitor.storage.database import Database
 from eco_damage_monitor.utils.logging_utils import setup_logging
 
 app = typer.Typer(help="广域生态破坏公开网络信息采集与分析系统 CLI")
+
+logger = logging.getLogger("eco_damage_monitor.cli")
 
 
 def _collector_for_source(source: SourceDefinition, app_config):
@@ -54,15 +57,35 @@ def collect(only_enabled: bool = True) -> None:
     db = Database(app_config.db_url)
     db.init_db()
     all_docs = []
+    selected_sources = 0
     for source in sources_config.sources:
         if only_enabled and not source.enabled:
             continue
+        selected_sources += 1
         collector = _collector_for_source(source, app_config)
+        logger.info("Collecting source=%s type=%s seeds=%s", source.name, source.source_type, len(source.seed_urls))
         try:
-            all_docs.extend(list(collector.collect()))
+            docs = list(collector.collect())
+            all_docs.extend(docs)
+            stats = collector.get_stats_snapshot()
+            logger.info(
+                "Source %s finished: documents=%s list_pages=%s detail_pages=%s skipped=%s errors=%s robots_blocked=%s",
+                source.name,
+                stats.get("documents_collected", 0),
+                stats.get("list_pages_fetched", 0),
+                stats.get("detail_pages_fetched", 0),
+                stats.get("skipped", 0),
+                stats.get("errors", 0),
+                stats.get("robots_blocked", 0),
+            )
         finally:
             collector.close()
+    if selected_sources == 0:
+        typer.echo("No sources were selected for collection")
+        return
     db.upsert_documents(all_docs)
+    if not all_docs:
+        typer.echo("Collected 0 documents; check source config, selectors, robots handling, and network access")
     typer.echo(f"Collected {len(all_docs)} documents")
 
 
@@ -125,11 +148,8 @@ def analyze() -> None:
 @app.command("export")
 def export(output: str = "data/exports/documents.jsonl") -> None:
     _, app_config, _, _ = load_settings()
-    output_path = Path(output)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-
     db = Database(app_config.db_url)
-    db.export_jsonl(str(output_path))
+    db.export_jsonl(output)
     typer.echo(f"Exported data to {output}")
 
 
@@ -139,17 +159,14 @@ def generate_report(output: str = "data/exports/daily_report.md", period_name: s
     db = Database(app_config.db_url)
     analytics = AnalyticsService(db.fetch_documents())
     report = analytics.markdown_report(period_name)
-
-    output_path = Path(output)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(report, encoding="utf-8")
-
+    Path(output).write_text(report, encoding="utf-8")
     typer.echo(f"Generated report: {output}")
 
 
 @app.command("pipeline-run")
 def pipeline_run() -> None:
     init_db()
+    collect()
     analyze()
     generate_report()
 
